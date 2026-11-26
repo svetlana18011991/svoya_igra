@@ -135,13 +135,14 @@ window.MATHJAX_B64='KGZ1bmN0aW9uKCl7InVzZSBzdHJpY3QiO3ZhciBfX3dlYnBhY2tfbW9kdWxl
 <header class="top">
   <div class="brand">🎮 Редактор «Своя игра»
     <small>Создание автономной HTML-игры для урока</small>
-    <span class="brandAuthor">Шкатулка математических интерпретаций Светланы Быковой</span>
+    <span class="brandAuthor">Шкатулка математических интерактивов Светланы Быковой</span>
     <a class="brandSite" href="https://shkatulka.sistema-math.ru/" target="_blank" rel="noopener">https://shkatulka.sistema-math.ru/</a>
   </div>
   <div class="actions">
     <button class="btn" onclick="openHelp()">❓ Инструкция</button>
     <button class="btn" onclick="saveProject()">💾 Сохранить проект</button>
     <button class="btn" onclick="loadProjectClick()">📂 Открыть проект</button>
+    <button class="btn danger" onclick="resetEditor()">🧹 Сбросить всё</button>
     <button class="btn primary" onclick="downloadGame()">⬇ Скачать игру HTML</button>
     <input id="projectFile" type="file" accept=".json" hidden onchange="loadProject(event)">
   </div>
@@ -340,7 +341,7 @@ window.MATHJAX_B64='KGZ1bmN0aW9uKCl7InVzZSBzdHJpY3QiO3ZhciBfX3dlYnBhY2tfbW9kdWxl
       <div class="helpStep">
         <div class="helpNum">11</div>
         <div><b>Сохраните проект</b>
-          <p>Кнопка «💾 Сохранить проект» сохраняет JSON-файл со всеми вопросами, ответами, медиа и настройками. Позже его можно снова открыть кнопкой «📂 Открыть проект» и продолжить редактирование.</p>
+          <p>Кнопка «💾 Сохранить проект» сохраняет JSON-файл со всеми вопросами, ответами, медиа и настройками. Позже его можно снова открыть кнопкой «📂 Открыть проект» и продолжить редактирование. Редактор не восстанавливает проект автоматически после закрытия страницы. Кнопка «🧹 Сбросить всё» очищает текущую открытую игру и возвращает исходный шаблон; сохранённые JSON-файлы на компьютере она не удаляет.</p>
         </div>
       </div>
 
@@ -632,6 +633,34 @@ function refreshDesignPreview(){syncDesign();designPreview.srcdoc=gameHTML(true)
 function refreshPreview(){gamePreview.srcdoc=gameHTML(false)}
 
 function openHelp(){helpOverlay.classList.add('show')}function closeHelp(){helpOverlay.classList.remove('show')}
+function resetEditor(){
+  if(!confirm('Сбросить всю текущую игру? Будут удалены категории, вопросы, ответы, изображения, звук и настройки оформления. Сохранённые на компьютере JSON-файлы не удаляются.'))return;
+  model.title='Своя игра';
+  model.subtitle='Учебная викторина';
+  model.teamCount=4;
+  model.values=[100,200,300,400,500];
+  model.categories=[1,2,3,4,5,6].map(i=>({name:'Тема '+i,items:{}}));
+  model.design={
+    startTheme:'light',
+    bgMode:'theme',
+    bgImage:null,
+    questionBgMode:'standard',
+    questionBgImage:null,
+    accent:'#d88a00',
+    main:'#18324a',
+    logo:'Σ',
+    radius:16,
+    questionFont:'segoe',
+    questionFontSize:44
+  };
+  editing=null;
+  tempMedia={q:null,a:null};
+  if(document.getElementById('bulkText'))bulkText.value='';
+  if(document.getElementById('bulkStatus'))bulkStatus.textContent='';
+  analyzeBulk();
+  renderAll();
+  showView('field',document.querySelector('.tab[data-view="field"]'));
+}
 function saveProject(){downloadBlob(new Blob([JSON.stringify(model,null,2)],{type:'application/json'}),(model.title||'svoya-igra')+'.json')}
 function loadProjectClick(){projectFile.click()}
 function loadProject(e){
