@@ -40,7 +40,7 @@ button,input,textarea,select{font:inherit}
 .hint{font-size:12px;color:var(--muted);line-height:1.4}
 .boardWrap{overflow:auto}
 .board{display:grid;gap:8px;min-width:720px}
-.cat{min-height:82px;border-radius:14px;background:linear-gradient(#fff,#edf4fb);border:1px solid #cddbe9;padding:10px;display:flex;align-items:center;justify-content:center;text-align:center;font-weight:850}
+.cat{min-height:82px;border-radius:14px;background:linear-gradient(#fff,#edf4fb);border:1px solid #cddbe9;padding:10px;display:flex;align-items:center;justify-content:center;text-align:center;font-weight:850;min-width:0;overflow:hidden;overflow-wrap:anywhere;word-break:break-word;hyphens:auto;line-height:1.15;font-size:clamp(14px,1.35vw,20px)}
 .cell{height:92px;border-radius:14px;border:1px solid #cddbe9;background:linear-gradient(145deg,#fff,#eef5fc);color:var(--gold);font-size:28px;font-weight:900;cursor:pointer;position:relative}
 .cell:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(43,74,104,.12)}
 .cell .state{position:absolute;right:8px;top:7px;font-size:14px}
@@ -190,10 +190,21 @@ window.MATHJAX_B64='KGZ1bmN0aW9uKCl7InVzZSBzdHJpY3QiO3ZhciBfX3dlYnBhY2tfbW9kdWxl
 Площадь треугольника | 200 | ... | ...
 Площадь параллелограмма | 100 | ... | ..."></textarea>
         <div id="bulkAnalysis" class="status">Вставьте вопросы — категории и стоимости будут распознаны автоматически.</div>
-        <div class="row" style="margin-top:10px"><button class="btn primary" onclick="parseBulk()">Разложить по клеткам</button><button class="btn" onclick="makeBulkTemplate()">Собрать из вопросов в список</button></div>
+        <div class="row" style="margin-top:10px">
+          <button class="btn primary" onclick="parseBulk()">Разложить по клеткам</button>
+          <button class="btn" onclick="makeBulkTemplate()">Собрать из вопросов в список</button>
+          <button class="btn good" onclick="copyAIPrompt()">📋 Скопировать промпт для нейросети</button>
+        </div>
+        <div id="aiPromptStatus" class="status" style="display:none"></div>
         <div id="bulkStatus" class="status"></div>
       </div>
-      <aside class="panel"><h3>Как устроено</h3><p class="hint">Редактор сам создаст категории по первому столбцу и строки стоимости по второму. Одна пара «категория + стоимость» = одна клетка.</p></aside>
+      <aside class="panel"><h3>Как устроено</h3>
+        <p class="hint">Редактор сам создаст категории по первому столбцу и строки стоимости по второму. Одна пара «категория + стоимость» = одна клетка.</p>
+        <div class="status" style="margin-top:14px">
+          <b>Для коллеги:</b><br>
+          нажмите «📋 Скопировать промпт для нейросети», вставьте его в ChatGPT или другую нейросеть и замените только три строки: <b>тема, класс, пожелания</b>. Нейросеть должна вернуть готовый список для вставки сюда.
+        </div>
+      </aside>
     </div>
   </section>
 
@@ -285,7 +296,7 @@ window.MATHJAX_B64='KGZ1bmN0aW9uKCl7InVzZSBzdHJpY3QiO3ZhciBfX3dlYnBhY2tfbW9kdWxl
       <div class="helpStep">
         <div class="helpNum">3</div>
         <div><b>Используйте быстрое заполнение</b>
-          <p>На вкладке «Быстрое заполнение» вставьте строки вида <span class="helpCode">Категория | Баллы | Вопрос | Ответ</span> или скопируйте таблицу из Excel / Google Sheets. Кнопка «Разложить по клеткам» автоматически создаст категории и вопросы.</p>
+          <p>На вкладке «Быстрое заполнение» вставьте строки вида <span class="helpCode">Категория | Баллы | Вопрос | Ответ</span> или скопируйте таблицу из Excel / Google Sheets. Кнопка «Разложить по клеткам» автоматически создаст категории и вопросы. Кнопка «📋 Скопировать промпт для нейросети» копирует готовую инструкцию: коллеге достаточно указать тему, класс и пожелания, а нейросеть должна вернуть список уже в нужном формате и с LaTeX для математических формул.</p>
         </div>
       </div>
 
@@ -529,6 +540,96 @@ async function compressImage(file){
 }
 async function embedAudio(file){if(file.size>12*1024*1024&&!confirm('Аудиофайл больше 12 МБ и заметно увеличит HTML. Всё равно встроить?'))throw new Error('Добавление отменено');return{type:'audio',data:await fileToDataURL(file),name:file.name,mime:file.type||'audio/mpeg'}}
 
+function getAIPrompt(){
+  return String.raw`Ты создаёшь вопросы для учебной игры «Своя игра».
+
+ИСХОДНЫЕ ДАННЫЕ — преподаватель меняет только эти три строки:
+ТЕМА: [впишите тему урока]
+КЛАСС: [впишите класс]
+ПОЖЕЛАНИЯ: [уровень сложности, типы заданий, акценты урока; если пожеланий нет — написать «нет»]
+
+ЗАДАЧА
+Составь комплект вопросов для игры «Своя игра» по указанной теме и классу.
+
+По умолчанию сделай 6 содержательных категорий и по 5 вопросов в каждой категории со стоимостью:
+100, 200, 300, 400, 500.
+Если в пожеланиях явно указано другое количество категорий, вопросов или другие баллы — следуй пожеланиям.
+
+ТРЕБОВАНИЯ К СОДЕРЖАНИЮ
+1. Вопросы должны соответствовать указанному классу и теме.
+2. Сложность внутри каждой категории должна в целом возрастать от 100 к 500 баллам.
+3. Не делай вопросы однотипными: используй вычисления, понимание теории, применение правил, анализ ошибок, задачи на рассуждение — когда это уместно для темы.
+4. Каждый вопрос должен иметь однозначный корректный ответ.
+5. Не пиши лишних пояснений, вступлений, нумерации и комментариев после списка.
+6. Не используй символ | внутри текста вопроса или ответа, потому что он служит разделителем столбцов.
+
+МАТЕМАТИКА И LATEX
+1. Все математические выражения оформляй в LaTeX.
+2. Формула внутри текста: $...$.
+3. Отдельная крупная формула: $$...$$, но она всё равно должна оставаться в той же физической строке результата.
+4. Используй математически грамотные команды, например:
+   $\frac{3}{4}$, $\sqrt{x+1}$, $x^2$, $x_1$,
+   $\sin \alpha$, $\cos 30^\circ$,
+   $\sum_{k=1}^{n} k$, $\int_0^1 x^2\,dx$.
+5. Для систем можно использовать:
+   $$\begin{cases}x+y=5\\x-y=1\end{cases}$$
+6. Для матриц можно использовать:
+   $$\begin{pmatrix}1&2\\3&4\end{pmatrix}$$
+7. Если нужен модуль, не используй обычные вертикальные черты |x|. Пиши $\lvert x\rvert$, чтобы символ | не ломал формат импорта.
+8. Не заменяй LaTeX картинками, Unicode-дробями или словами вроде «корень из», если уместна нормальная математическая запись.
+
+ФОРМАТ ОТВЕТА — СТРОГО
+Каждый вопрос выводи ОДНОЙ физической строкой в формате:
+
+Категория | Баллы | Вопрос | Ответ
+
+Пример:
+Линейные уравнения | 100 | Решите уравнение $3x+5=17$. | $x=4$
+Линейные уравнения | 200 | Найдите корень уравнения $\frac{x}{3}-2=5$. | $x=21$
+
+ВАЖНО
+- Одна строка = одна клетка игры.
+- Между четырьмя полями используй ровно разделитель " | ".
+- Не добавляй заголовок таблицы.
+- Не используй Markdown-таблицу.
+- Не используй тройные обратные кавычки и блоки кода.
+- Не делай реальных переносов строки внутри вопроса или ответа.
+- Никакого текста до первой строки и после последней строки.
+- Проверь, что каждая строка содержит ровно: категория, баллы, вопрос, ответ.
+
+Теперь создай готовый список по исходным данным выше.`;
+}
+
+async function copyAIPrompt(){
+  const text=getAIPrompt();
+  let ok=false;
+  try{
+    if(navigator.clipboard && window.isSecureContext){
+      await navigator.clipboard.writeText(text);
+      ok=true;
+    }
+  }catch(e){}
+  if(!ok){
+    const ta=document.createElement('textarea');
+    ta.value=text;
+    ta.setAttribute('readonly','');
+    ta.style.position='fixed';
+    ta.style.left='-9999px';
+    ta.style.top='0';
+    document.body.appendChild(ta);
+    ta.select();
+    try{ok=document.execCommand('copy')}catch(e){ok=false}
+    ta.remove();
+  }
+  const box=document.getElementById('aiPromptStatus');
+  box.style.display='block';
+  if(ok){
+    box.innerHTML='<b>✓ Промпт скопирован.</b> Вставьте его в нейросеть и замените только строки «ТЕМА», «КЛАСС» и «ПОЖЕЛАНИЯ».';
+  }else{
+    box.innerHTML='<b>Не удалось скопировать автоматически.</b> Браузер запретил доступ к буферу обмена. Откройте страницу по HTTPS или попробуйте ещё раз.';
+  }
+}
+
 function parseBulkRows(text){
   let rows=[];text.split(/\r?\n/).forEach(raw=>{
     let line=raw.trim();if(!line)return;let tab=line.includes('\t'),p=(tab?line.split('\t'):line.split('|')).map(x=>x.trim());
@@ -690,7 +791,7 @@ function gameHTML(){
 button,input{font:inherit}.app{padding:16px;max-width:1500px;margin:auto;min-height:100vh}
 html:fullscreen,html:-webkit-full-screen{background:#07111f}html:fullscreen body,html:-webkit-full-screen body{min-height:100vh}html:fullscreen .app,html:-webkit-full-screen .app{max-width:none;width:100%;min-height:100vh}
 ${model.design.bgMode==='image'&&model.design.bgImage?.data?`html:fullscreen body,html:-webkit-full-screen body{background:linear-gradient(rgba(7,17,31,.50),rgba(7,17,31,.68)),url(${model.design.bgImage.data}) center/cover fixed no-repeat}html:fullscreen body.light,html:-webkit-full-screen body.light{background:linear-gradient(rgba(255,255,255,.60),rgba(239,245,252,.76)),url(${model.design.bgImage.data}) center/cover fixed no-repeat}`:''}.top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px}.brand{display:flex;gap:10px;align-items:center}.logo{width:44px;height:44px;border-radius:14px;background:linear-gradient(135deg,#67e8f9,#8b5cf6);display:grid;place-items:center;color:#10223a;font-weight:900}.title{font-size:clamp(21px,2.2vw,34px);font-weight:900}.sub{font-size:12px;color:var(--muted)}.tools{display:flex;gap:7px}.btn{border:1px solid rgba(255,255,255,.18);background:rgba(16,31,50,.50);color:var(--text);padding:9px 12px;border-radius:11px;cursor:pointer;backdrop-filter:blur(8px)}body.light .btn{background:rgba(255,255,255,.78);border-color:#cbd9e8}
-.layout{display:grid;grid-template-columns:minmax(0,1fr) 240px;gap:12px}.board{display:grid;gap:8px}.cat,.cell{border-radius:var(--r);border:1px solid rgba(255,255,255,.15);box-shadow:0 7px 22px rgba(0,0,0,.13)}.cat{min-height:86px;background:rgba(20,39,64,.90);display:grid;place-items:center;text-align:center;padding:9px;font-weight:850;backdrop-filter:blur(9px)}.cell{height:96px;background:rgba(11,28,48,.90);color:var(--accent);font-size:clamp(25px,3vw,48px);font-weight:900;cursor:pointer;backdrop-filter:blur(9px)}.cell.used{opacity:.16;pointer-events:none}body.light .cat,body.light .cell{background:rgba(255,255,255,.90);border-color:#cbd9e8}body.light .cat{color:var(--main)}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 240px;gap:12px}.board{display:grid;gap:8px}.cat,.cell{border-radius:var(--r);border:1px solid rgba(255,255,255,.15);box-shadow:0 7px 22px rgba(0,0,0,.13)}.cat{min-height:86px;background:rgba(20,39,64,.90);display:grid;place-items:center;text-align:center;padding:9px;font-weight:850;backdrop-filter:blur(9px);min-width:0;overflow:hidden;overflow-wrap:anywhere;word-break:break-word;hyphens:auto;line-height:1.12;font-size:clamp(13px,1.45vw,20px)}.cell{height:96px;background:rgba(11,28,48,.90);color:var(--accent);font-size:clamp(25px,3vw,48px);font-weight:900;cursor:pointer;backdrop-filter:blur(9px)}.cell.used{opacity:.16;pointer-events:none}body.light .cat,body.light .cell{background:rgba(255,255,255,.90);border-color:#cbd9e8}body.light .cat{color:var(--main)}
 .teams{border:1px solid rgba(255,255,255,.16);border-radius:var(--r);padding:10px;background:rgba(14,29,47,.76);height:max-content;backdrop-filter:blur(10px)}body.light .teams{background:rgba(255,255,255,.88);border-color:#d4e0ec}.team{padding:9px;border:1px solid rgba(255,255,255,.12);border-radius:12px;margin:7px 0}.team input{width:100%;border:0;background:transparent;color:var(--text);font-weight:800;text-align:center}.score{text-align:center;font-size:28px;font-weight:900}.scoreBtns{display:grid;grid-template-columns:1fr 1fr;gap:5px}.scoreBtns button{border:0;border-radius:8px;padding:6px;cursor:pointer}
 .modal{position:fixed;inset:0;background:rgba(2,7,14,.80);backdrop-filter:blur(10px);display:none;align-items:center;justify-content:center;padding:8px;overflow:hidden}.modal.show{display:flex}.card{width:min(1080px,calc(100vw - 16px));height:min(760px,calc(100dvh - 16px));max-height:calc(100dvh - 16px);border-radius:24px;background:rgba(12,29,49,.95);padding:clamp(10px,1.7vh,20px);display:grid;grid-template-rows:auto minmax(0,1fr) auto auto auto;gap:clamp(5px,1vh,10px);overflow:hidden;border:1px solid rgba(255,255,255,.15)}body.light .card{background:rgba(255,255,255,.95);color:#18324a}.card.qbg-paper{background:linear-gradient(160deg,#fffef9,#f4ecdc)!important;color:#18324a;border-color:#dfd2ba}.card.qbg-grid{background:linear-gradient(#dceafa 1px,transparent 1px),linear-gradient(90deg,#dceafa 1px,transparent 1px),#fff!important;background-size:24px 24px!important;color:#18324a;border-color:#bfd4e8}.card.qbg-chalk{background:radial-gradient(circle at 18% 12%,#315e4d,#17382f 72%)!important;color:#fffdf1;border-color:#537b6d}${qBgImageCss}.qtop{display:flex;justify-content:space-between}.points{color:var(--accent);font-weight:900;font-size:24px}.question{min-height:0;overflow:auto;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;font-family:var(--qfont);font-weight:750;font-size:clamp(18px,min(var(--qsize),6.2vh),var(--qsize));line-height:1.14;padding:8px}.card.answered .question{font-size:clamp(17px,min(var(--qsizeAnswer),4.5vh),var(--qsizeAnswer))}.answer{display:none;padding:10px;border-radius:15px;background:rgba(52,211,153,.12);text-align:center;font-size:clamp(18px,min(2.2vw,3.1vh),30px);max-height:24vh;overflow:auto}.answer.show{display:block}.actions{display:flex;justify-content:center;gap:8px}.primary{background:linear-gradient(135deg,#ffd166,#f59e0b);color:#2d250e;border:0;font-weight:850}.judge{display:none;gap:6px}.judge.show{display:grid}.jt{text-align:center;border:1px solid rgba(255,255,255,.12);border-radius:11px;padding:5px}.jb{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:4px}.jb button{border:0;border-radius:8px;padding:6px;font-weight:900;cursor:pointer}.good{background:#dff8ee;color:#12684d}.bad{background:#ffe6eb;color:#a7354a}.jb button.selected{outline:3px solid currentColor}.gameMedia{margin-top:10px;max-width:min(760px,90%);max-height:min(28vh,260px);border-radius:14px;object-fit:contain}.gameAudio{margin-top:8px;width:min(620px,90%);height:38px}
 .scratchInline{display:none;margin-top:2px;border:1px solid #a9c8e6;border-radius:12px;background:#eaf5ff;color:#17324a;overflow:hidden;flex:0 0 auto}.scratchInline.show{display:block}.card.scratch-open{grid-template-rows:auto minmax(105px,auto) auto auto auto auto;overflow:auto;align-content:start}.card.scratch-open .question{max-height:27vh;min-height:105px;justify-content:flex-start;overscroll-behavior:contain}.card.scratch-open .question>div:first-child{width:100%}.scratchTop{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:7px 9px;background:#dff1ff;border-bottom:1px solid #b8d5ef;position:sticky;top:0;z-index:5}.scratchTool{border:1px solid transparent;background:transparent;color:#17324a;border-radius:7px;padding:6px 8px;cursor:pointer;font-weight:850;font-size:16px;line-height:1}.scratchTool:hover{background:#fff8}.scratchTool.active{background:#fff;border-color:#8bb8df;box-shadow:0 1px 4px rgba(31,72,108,.12)}.scratchShape{height:32px;border:1px solid #9ec2e2;border-radius:6px;background:#fff;color:#17324a;padding:0 7px;font-weight:750}.scratchShape.active{outline:2px solid #5a9bd4}.scratchSep{width:1px;height:25px;background:#a9c9e5;margin:0 1px}.scratchControl{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:850;color:#41627d}.scratchControl input[type=range]{width:92px;accent-color:#1d75d0}.scratchColor{width:34px;height:28px;border:1px solid #8fb8dc;border-radius:4px;padding:1px;background:#fff;cursor:pointer}.scratchZoomLabel{min-width:42px;font-size:11px;text-align:center;font-weight:900;color:#41627d}.scratchViewport{height:320px;overflow:auto;background:#fff;scrollbar-color:#8aa6bf #eef4fa}.scratchStage{position:relative;width:100%;height:960px;background-color:#fff;background-image:linear-gradient(#d6e9fa 1px,transparent 1px),linear-gradient(90deg,#d6e9fa 1px,transparent 1px);background-size:24px 24px;transform-origin:top left}.scratchCanvas{position:absolute;inset:0;display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}.scratchHint{padding:5px 9px;background:#f8fcff;border-top:1px solid #d5e6f5;font-size:10px;color:#698097}.scratchTool[data-tool=marker]{color:#c2185b}.scratchTool[data-tool=eraser]{color:#875c00}.scratchTool[data-tool=hand]{color:#8a5700}@media(max-width:800px){.scratchViewport{height:280px}.scratchTop{padding:6px;gap:4px}.scratchTool{padding:5px 6px;font-size:14px}.scratchControl input[type=range]{width:68px}.scratchShape{max-width:118px}}.scratchTop{padding:6px}.scratchTool{padding:6px 7px;font-size:12px}.scratchControl input[type=range]{width:70px}.scratchTitle{width:100%}.scratchClose{margin-left:0}}.question mjx-container,.answer mjx-container{max-width:100%;overflow-x:auto;overflow-y:hidden}.question mjx-container[display="true"],.answer mjx-container[display="true"]{margin:.45em 0!important}.question mjx-container svg,.answer mjx-container svg{max-width:100%;height:auto}
