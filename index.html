@@ -107,7 +107,7 @@ button,input,textarea,select{font:inherit}
 .helpStep{display:grid;grid-template-columns:34px 1fr;gap:10px;align-items:start;border:1px solid var(--line);border-radius:13px;padding:10px;background:#f8fbfe}
 .helpNum{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:#e8f0ff;color:#2955bd;font-weight:900}
 .helpStep b{display:block;margin-bottom:2px}.helpStep p{margin:0;color:#516b83;font-size:13px;line-height:1.4}
-.helpTip{margin-top:12px;padding:11px 12px;border-radius:12px;background:#eef8f4;border:1px solid #cce9dd;color:#235d49;font-size:13px;line-height:1.45}
+.helpTip{margin-top:12px;padding:11px 12px;border-radius:12px;background:#eef8f4;border:1px solid #cce9dd;color:#235d49;font-size:13px;line-height:1.45}.uiDialogOverlay{position:fixed;inset:0;z-index:5000;background:rgba(14,28,43,.54);backdrop-filter:blur(5px);display:none;align-items:center;justify-content:center;padding:16px}.uiDialogOverlay.show{display:flex}.uiDialog{width:min(520px,96vw);background:#fff;color:#18324a;border:1px solid #d4e0ec;border-radius:18px;box-shadow:0 28px 90px rgba(0,0,0,.25);padding:18px}.uiDialog h3{margin:0 0 8px;font-size:20px}.uiDialog p{margin:0;color:#4f657a;line-height:1.5;white-space:pre-wrap}.uiDialogActions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}.uiDialogActions .btn{min-width:96px}
 .helpCode{font-family:Consolas,monospace;background:#eef3f8;border-radius:6px;padding:1px 5px;color:#23415e}
 @media(max-height:720px){.editCard{max-height:calc(100dvh - 8px);border-radius:16px}.editHead{padding:10px 0 8px}.field{margin:7px 0}.field textarea{min-height:86px}}
 @media(max-width:900px){.workspace,.bulk,.designGrid{grid-template-columns:1fr}.top{position:static}.previewFrame{height:520px}}
@@ -268,6 +268,14 @@ window.MATHJAX_B64='KGZ1bmN0aW9uKCl7InVzZSBzdHJpY3QiO3ZhciBfX3dlYnBhY2tfbW9kdWxl
   <section id="view-preview" class="view"><div class="panel"><h3>Предпросмотр игры</h3><iframe id="gamePreview" class="previewFrame"></iframe></div></section>
 </div>
 
+<div id="uiDialogOverlay" class="uiDialogOverlay" role="dialog" aria-modal="true" aria-labelledby="uiDialogTitle">
+  <div class="uiDialog">
+    <h3 id="uiDialogTitle">Сообщение</h3>
+    <p id="uiDialogText"></p>
+    <div id="uiDialogActions" class="uiDialogActions"></div>
+  </div>
+</div>
+
 <div id="helpOverlay" class="helpOverlay" onclick="if(event.target===this)closeHelp()">
   <div class="helpCard">
     <div class="helpHead">
@@ -388,6 +396,48 @@ window.MATHJAX_B64='KGZ1bmN0aW9uKCl7InVzZSBzdHJpY3QiO3ZhciBfX3dlYnBhY2tfbW9kdWxl
 </div>
 
 <script>
+let uiDialogResolve=null;
+function closeUiDialog(value){
+  const o=document.getElementById('uiDialogOverlay');
+  o.classList.remove('show');
+  const r=uiDialogResolve;uiDialogResolve=null;
+  if(r)r(value)
+}
+function uiAlert(message,title='Сообщение'){
+  return new Promise(resolve=>{
+    uiDialogResolve=resolve;
+    uiDialogTitle.textContent=title;
+    uiDialogText.textContent=String(message??'');
+    uiDialogActions.innerHTML='';
+    const ok=document.createElement('button');ok.className='btn primary';ok.textContent='OK';ok.onclick=()=>closeUiDialog(true);
+    uiDialogActions.appendChild(ok);
+    uiDialogOverlay.classList.add('show');
+    setTimeout(()=>ok.focus(),0)
+  })
+}
+function uiConfirm(message,title='Подтверждение'){
+  return new Promise(resolve=>{
+    uiDialogResolve=resolve;
+    uiDialogTitle.textContent=title;
+    uiDialogText.textContent=String(message??'');
+    uiDialogActions.innerHTML='';
+    const cancel=document.createElement('button');cancel.className='btn';cancel.textContent='Отмена';cancel.onclick=()=>closeUiDialog(false);
+    const ok=document.createElement('button');ok.className='btn danger';ok.textContent='Продолжить';ok.onclick=()=>closeUiDialog(true);
+    uiDialogActions.append(cancel,ok);
+    uiDialogOverlay.classList.add('show');
+    setTimeout(()=>cancel.focus(),0)
+  })
+}
+function installBasicProtection(){
+  document.addEventListener('contextmenu',e=>e.preventDefault());
+  document.addEventListener('dragstart',e=>{if(e.target?.tagName==='IMG')e.preventDefault()});
+  document.addEventListener('keydown',e=>{
+    const k=(e.key||'').toLowerCase();
+    const blocked=e.key==='F12'||(e.ctrlKey&&k==='u')||(e.ctrlKey&&e.shiftKey&&['i','j','c'].includes(k));
+    if(blocked){e.preventDefault();e.stopPropagation()}
+  },true)
+}
+
 const model={
   title:'Своя игра',subtitle:'Учебная викторина',teamCount:4,values:[100,200,300,400,500],
   categories:[1,2,3,4,5,6].map(i=>({name:'Тема '+i,items:{}})),
@@ -520,7 +570,7 @@ function pickMedia(side,type){
   mediaPicker.onchange=async e=>{
     let f=e.target.files[0];if(!f)return;
     try{tempMedia[side]=type==='image'?await compressImage(f):await embedAudio(f);renderMediaPreview(side)}
-    catch(err){alert('Не удалось обработать файл: '+err.message)}
+    catch(err){uiAlert('Не удалось обработать файл: '+err.message,'Ошибка')}
   };mediaPicker.click()
 }
 function removeMedia(side){tempMedia[side]=null;renderMediaPreview(side)}
@@ -538,7 +588,7 @@ async function compressImage(file){
   let o=c.toDataURL('image/webp',.72);if(!o.startsWith('data:image/webp'))o=c.toDataURL('image/jpeg',.72);
   return{type:'image',data:o,name:file.name,width:w,height:h}
 }
-async function embedAudio(file){if(file.size>12*1024*1024&&!confirm('Аудиофайл больше 12 МБ и заметно увеличит HTML. Всё равно встроить?'))throw new Error('Добавление отменено');return{type:'audio',data:await fileToDataURL(file),name:file.name,mime:file.type||'audio/mpeg'}}
+async function embedAudio(file){if(file.size>12*1024*1024&&!(await uiConfirm('Аудиофайл больше 12 МБ и заметно увеличит HTML. Всё равно встроить?','Большой аудиофайл')))throw new Error('Добавление отменено');return{type:'audio',data:await fileToDataURL(file),name:file.name,mime:file.type||'audio/mpeg'}}
 
 function getAIPrompt(){
   return String.raw`Помоги мне подготовить вопросы для учебной игры «Своя игра».
@@ -757,8 +807,8 @@ function refreshDesignPreview(){syncDesign();designPreview.srcdoc=gameHTML(true)
 function refreshPreview(){gamePreview.srcdoc=gameHTML(false)}
 
 function openHelp(){helpOverlay.classList.add('show')}function closeHelp(){helpOverlay.classList.remove('show')}
-function resetEditor(){
-  if(!confirm('Сбросить всю текущую игру? Будут удалены категории, вопросы, ответы, изображения, звук и настройки оформления. Сохранённые на компьютере JSON-файлы не удаляются.'))return;
+async function resetEditor(){
+  if(!(await uiConfirm('Сбросить всю текущую игру? Будут удалены категории, вопросы, ответы, изображения, звук и настройки оформления. Сохранённые на компьютере JSON-файлы не удаляются.','Сбросить всё?')))return;
   model.title='Своя игра';
   model.subtitle='Учебная викторина';
   model.teamCount=4;
@@ -789,11 +839,11 @@ function saveProject(){downloadBlob(new Blob([JSON.stringify(model,null,2)],{typ
 function loadProjectClick(){projectFile.click()}
 function loadProject(e){
   let f=e.target.files[0];if(!f)return;let r=new FileReader();
-  r.onload=()=>{try{let x=JSON.parse(r.result);Object.keys(model).forEach(k=>delete model[k]);Object.assign(model,x);if(!model.teamCount)model.teamCount=4;model.design=model.design||{};if(!('bgMode' in model.design))model.design.bgMode='theme';if(!('bgImage' in model.design))model.design.bgImage=null;if(!model.design.questionBgMode)model.design.questionBgMode='standard';if(!('questionBgImage' in model.design))model.design.questionBgImage=null;if(!model.design.questionFont)model.design.questionFont='segoe';if(!model.design.questionFontSize)model.design.questionFontSize=44;renderAll();alert('Проект открыт.')}catch(err){alert('Не удалось прочитать проект.')}};
+  r.onload=()=>{try{let x=JSON.parse(r.result);Object.keys(model).forEach(k=>delete model[k]);Object.assign(model,x);if(!model.teamCount)model.teamCount=4;model.design=model.design||{};if(!('bgMode' in model.design))model.design.bgMode='theme';if(!('bgImage' in model.design))model.design.bgImage=null;if(!model.design.questionBgMode)model.design.questionBgMode='standard';if(!('questionBgImage' in model.design))model.design.questionBgImage=null;if(!model.design.questionFont)model.design.questionFont='segoe';if(!model.design.questionFontSize)model.design.questionFontSize=44;renderAll();uiAlert('Проект открыт.','Готово')}catch(err){uiAlert('Не удалось прочитать проект.','Ошибка')}};
   r.readAsText(f);e.target.value=''
 }
 function countFilledQuestions(){let n=0;model.categories.forEach(c=>model.values.forEach(v=>{if(c.items?.[v]?.question?.trim())n++}));return n}
-function downloadGame(){if(!model.categories.length||!countFilledQuestions()){alert('Игра пока пустая. Добавьте хотя бы один вопрос.');return}downloadBlob(new Blob([gameHTML(false)],{type:'text/html;charset=utf-8'}),(model.title||'svoya-igra').replace(/[\\/:*?"<>|]+/g,'_')+'.html')}
+function downloadGame(){if(!model.categories.length||!countFilledQuestions()){uiAlert('Игра пока пустая. Добавьте хотя бы один вопрос.','Нечего скачивать');return}downloadBlob(new Blob([gameHTML(false)],{type:'text/html;charset=utf-8'}),(model.title||'svoya-igra').replace(/[\\/:*?"<>|]+/g,'_')+'.html')}
 function downloadBlob(blob,name){let a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
 function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
 
@@ -817,7 +867,7 @@ ${model.design.bgMode==='image'&&model.design.bgImage?.data?`html:fullscreen bod
 .layout{display:grid;grid-template-columns:minmax(0,1fr) 240px;gap:12px}.board{display:grid;gap:8px}.cat,.cell{border-radius:var(--r);border:1px solid rgba(255,255,255,.15);box-shadow:0 7px 22px rgba(0,0,0,.13)}.cat{min-height:86px;background:rgba(20,39,64,.90);display:grid;place-items:center;text-align:center;padding:9px;font-weight:850;backdrop-filter:blur(9px);min-width:0;overflow:hidden;overflow-wrap:anywhere;word-break:break-word;hyphens:auto;line-height:1.12;font-size:clamp(13px,1.45vw,20px)}.cell{height:96px;background:rgba(11,28,48,.90);color:var(--accent);font-size:clamp(25px,3vw,48px);font-weight:900;cursor:pointer;backdrop-filter:blur(9px)}.cell.used{opacity:.34;filter:saturate(.45);cursor:pointer}.cell.used:hover{opacity:.52;filter:saturate(.7)}body.light .cat,body.light .cell{background:rgba(255,255,255,.90);border-color:#cbd9e8}body.light .cat{color:var(--main)}
 .teams{border:1px solid rgba(255,255,255,.16);border-radius:var(--r);padding:10px;background:rgba(14,29,47,.76);height:max-content;backdrop-filter:blur(10px)}body.light .teams{background:rgba(255,255,255,.88);border-color:#d4e0ec}.team{padding:9px;border:1px solid rgba(255,255,255,.12);border-radius:12px;margin:7px 0}.team input{width:100%;border:0;background:transparent;color:var(--text);font-weight:800;text-align:center}.score{text-align:center;font-size:28px;font-weight:900}.scoreBtns{display:grid;grid-template-columns:1fr 1fr;gap:5px}.scoreBtns button{border:0;border-radius:8px;padding:6px;cursor:pointer}
 .modal{position:fixed;inset:0;background:rgba(2,7,14,.80);backdrop-filter:blur(10px);display:none;align-items:center;justify-content:center;padding:8px;overflow:hidden}.modal.show{display:flex}.card{width:min(1080px,calc(100vw - 16px));height:min(760px,calc(100dvh - 16px));max-height:calc(100dvh - 16px);border-radius:24px;background:rgba(12,29,49,.95);padding:clamp(10px,1.7vh,20px);display:grid;grid-template-rows:auto minmax(0,1fr) auto auto auto;gap:clamp(5px,1vh,10px);overflow:hidden;border:1px solid rgba(255,255,255,.15)}body.light .card{background:rgba(255,255,255,.95);color:#18324a}.card.qbg-paper{background:linear-gradient(160deg,#fffef9,#f4ecdc)!important;color:#18324a;border-color:#dfd2ba}.card.qbg-grid{background:linear-gradient(#dceafa 1px,transparent 1px),linear-gradient(90deg,#dceafa 1px,transparent 1px),#fff!important;background-size:24px 24px!important;color:#18324a;border-color:#bfd4e8}.card.qbg-chalk{background:radial-gradient(circle at 18% 12%,#315e4d,#17382f 72%)!important;color:#fffdf1;border-color:#537b6d}${qBgImageCss}.qtop{display:flex;justify-content:space-between}.points{color:var(--accent);font-weight:900;font-size:24px}.question{min-height:0;overflow:auto;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;font-family:var(--qfont);font-weight:750;font-size:clamp(18px,min(var(--qsize),6.2vh),var(--qsize));line-height:1.14;padding:8px}.card.answered .question{font-size:clamp(17px,min(var(--qsizeAnswer),4.5vh),var(--qsizeAnswer))}.answer{display:none;padding:10px;border-radius:15px;background:rgba(52,211,153,.12);text-align:center;font-size:clamp(18px,min(2.2vw,3.1vh),30px);max-height:24vh;overflow:auto}.answer.show{display:block}.actions{display:flex;justify-content:center;gap:8px}.primary{background:linear-gradient(135deg,#ffd166,#f59e0b);color:#2d250e;border:0;font-weight:850}.judge{display:none;gap:6px}.judge.show{display:grid}.jt{text-align:center;border:1px solid rgba(255,255,255,.12);border-radius:11px;padding:5px}.jb{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:4px}.jb button{border:0;border-radius:8px;padding:6px;font-weight:900;cursor:pointer}.good{background:#dff8ee;color:#12684d}.bad{background:#ffe6eb;color:#a7354a}.jb button.selected{outline:3px solid currentColor}.gameMedia{margin-top:10px;max-width:min(760px,90%);max-height:min(28vh,260px);border-radius:14px;object-fit:contain}.gameAudio{margin-top:8px;width:min(620px,90%);height:38px}
-.scratchInline{display:none;margin-top:2px;border:1px solid #a9c8e6;border-radius:12px;background:#eaf5ff;color:#17324a;overflow:hidden;flex:0 0 auto}.scratchInline.show{display:block}.card.scratch-open{grid-template-rows:auto minmax(105px,auto) auto auto auto auto;overflow:auto;align-content:start}.card.scratch-open .question{max-height:27vh;min-height:105px;justify-content:flex-start;overscroll-behavior:contain}.card.scratch-open .question>div:first-child{width:100%}.scratchTop{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:7px 9px;background:#dff1ff;border-bottom:1px solid #b8d5ef;position:sticky;top:0;z-index:5}.scratchTool{border:1px solid transparent;background:transparent;color:#17324a;border-radius:7px;padding:6px 8px;cursor:pointer;font-weight:850;font-size:16px;line-height:1}.scratchTool:hover{background:#fff8}.scratchTool.active{background:#fff;border-color:#8bb8df;box-shadow:0 1px 4px rgba(31,72,108,.12)}.scratchShape{height:32px;border:1px solid #9ec2e2;border-radius:6px;background:#fff;color:#17324a;padding:0 7px;font-weight:750}.scratchShape.active{outline:2px solid #5a9bd4}.scratchSep{width:1px;height:25px;background:#a9c9e5;margin:0 1px}.scratchControl{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:850;color:#41627d}.scratchControl input[type=range]{width:92px;accent-color:#1d75d0}.scratchColor{width:34px;height:28px;border:1px solid #8fb8dc;border-radius:4px;padding:1px;background:#fff;cursor:pointer}.scratchZoomLabel{min-width:42px;font-size:11px;text-align:center;font-weight:900;color:#41627d}.scratchViewport{height:320px;overflow:auto;background:#fff;scrollbar-color:#8aa6bf #eef4fa}.scratchStage{position:relative;width:100%;height:960px;background-color:#fff;background-image:linear-gradient(#d6e9fa 1px,transparent 1px),linear-gradient(90deg,#d6e9fa 1px,transparent 1px);background-size:24px 24px;transform-origin:top left}.scratchCanvas{position:absolute;inset:0;display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}.scratchHint{padding:5px 9px;background:#f8fcff;border-top:1px solid #d5e6f5;font-size:10px;color:#698097}.scratchTool[data-tool=marker]{color:#c2185b}.scratchTool[data-tool=eraser]{color:#875c00}.scratchTool[data-tool=hand]{color:#8a5700}@media(max-width:800px){.scratchViewport{height:280px}.scratchTop{padding:6px;gap:4px}.scratchTool{padding:5px 6px;font-size:14px}.scratchControl input[type=range]{width:68px}.scratchShape{max-width:118px}}.scratchTop{padding:6px}.scratchTool{padding:6px 7px;font-size:12px}.scratchControl input[type=range]{width:70px}.scratchTitle{width:100%}.scratchClose{margin-left:0}}.question mjx-container,.answer mjx-container{max-width:100%;overflow-x:auto;overflow-y:hidden}.question mjx-container[display="true"],.answer mjx-container[display="true"]{margin:.45em 0!important}.question mjx-container svg,.answer mjx-container svg{max-width:100%;height:auto}
+.scratchInline{display:none;margin-top:2px;border:1px solid #a9c8e6;border-radius:12px;background:#eaf5ff;color:#17324a;overflow:hidden;flex:0 0 auto}.scratchInline.show{display:block}.card.scratch-open{grid-template-rows:auto minmax(105px,auto) auto auto auto auto;overflow:auto;align-content:start}.card.scratch-open .question{max-height:27vh;min-height:105px;justify-content:flex-start;overscroll-behavior:contain}.card.scratch-open .question>div:first-child{width:100%}.scratchTop{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:7px 9px;background:#dff1ff;border-bottom:1px solid #b8d5ef;position:sticky;top:0;z-index:5}.scratchTool{border:1px solid transparent;background:transparent;color:#17324a;border-radius:7px;padding:6px 8px;cursor:pointer;font-weight:850;font-size:16px;line-height:1}.scratchTool:hover{background:#fff8}.scratchTool.active{background:#fff;border-color:#8bb8df;box-shadow:0 1px 4px rgba(31,72,108,.12)}.scratchShape{height:32px;border:1px solid #9ec2e2;border-radius:6px;background:#fff;color:#17324a;padding:0 7px;font-weight:750}.scratchShape.active{outline:2px solid #5a9bd4}.scratchSep{width:1px;height:25px;background:#a9c9e5;margin:0 1px}.scratchControl{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:850;color:#41627d}.scratchControl input[type=range]{width:92px;accent-color:#1d75d0}.scratchColor{width:34px;height:28px;border:1px solid #8fb8dc;border-radius:4px;padding:1px;background:#fff;cursor:pointer}.scratchZoomLabel{min-width:42px;font-size:11px;text-align:center;font-weight:900;color:#41627d}.scratchViewport{height:320px;overflow:auto;background:#fff;scrollbar-color:#8aa6bf #eef4fa}.scratchStage{position:relative;width:100%;height:960px;background-color:#fff;background-image:linear-gradient(#d6e9fa 1px,transparent 1px),linear-gradient(90deg,#d6e9fa 1px,transparent 1px);background-size:24px 24px;transform-origin:top left}.scratchCanvas{position:absolute;inset:0;display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}.scratchHint{padding:5px 9px;background:#f8fcff;border-top:1px solid #d5e6f5;font-size:10px;color:#698097}.scratchTool[data-tool=marker]{color:#c2185b}.scratchTool[data-tool=eraser]{color:#875c00}.scratchTool[data-tool=hand]{color:#8a5700}.gameDialogOverlay{position:fixed;inset:0;z-index:3000;background:rgba(2,7,14,.68);backdrop-filter:blur(5px);display:none;align-items:center;justify-content:center;padding:14px}.gameDialogOverlay.show{display:flex}.gameDialogBox{width:min(500px,94vw);background:#fff;color:#18324a;border-radius:18px;border:1px solid #cfdbe7;box-shadow:0 28px 90px rgba(0,0,0,.28);padding:18px}.gameDialogBox h3{margin:0 0 8px}.gameDialogBox p{margin:0;color:#526a82;line-height:1.5;white-space:pre-wrap}.gameDialogActions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}.gameDialogActions button{border:1px solid #cad7e4;background:#fff;color:#18324a;border-radius:10px;padding:8px 13px;cursor:pointer;font-weight:800}.gameDialogActions .danger{background:#ffe8ec;color:#a7354a;border-color:#ffc6d1}@media(max-width:800px){.scratchViewport{height:280px}.scratchTop{padding:6px;gap:4px}.scratchTool{padding:5px 6px;font-size:14px}.scratchControl input[type=range]{width:68px}.scratchShape{max-width:118px}}.scratchTop{padding:6px}.scratchTool{padding:6px 7px;font-size:12px}.scratchControl input[type=range]{width:70px}.scratchTitle{width:100%}.scratchClose{margin-left:0}}.question mjx-container,.answer mjx-container{max-width:100%;overflow-x:auto;overflow-y:hidden}.question mjx-container[display="true"],.answer mjx-container[display="true"]{margin:.45em 0!important}.question mjx-container svg,.answer mjx-container svg{max-width:100%;height:auto}
 .math-inline{display:inline-flex;align-items:center;font-family:"Cambria Math","Times New Roman",serif}.mfrac{display:inline-flex;flex-direction:column;align-items:center;line-height:1.05;margin:0 .12em}.mfrac>.num{padding:0 .16em .08em;border-bottom:2px solid currentColor}.mfrac>.den{padding:.08em .16em 0}.msqrt{display:inline-flex;align-items:stretch}.msqrt>.body{border-top:2px solid currentColor;padding:0 .12em}.msup{font-size:.68em;vertical-align:super}.msub{font-size:.68em;vertical-align:sub}
 @media(max-width:900px){.layout{grid-template-columns:1fr}.teams{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}.board{min-width:650px}.app{overflow:auto}}
 </style></head><body><div class="app"><div class="top"><div class="brand"><div class="logo">${esc(model.design.logo||'Σ')}</div><div><div class="title">${esc(model.title)}</div><div class="sub">${esc(model.subtitle)}</div></div></div><div class="tools"><button class="btn" onclick="toggleTheme()">☀/☾ Тема</button><button id="screenBtn" class="btn" onclick="toggleFullscreen()">⛶ Экран</button><button class="btn" onclick="resetGame()">↻ Новая</button></div></div><div class="layout"><main style="overflow:auto"><div id="board" class="board"></div></main><aside class="teams"><b>Команды</b><div id="teams"></div></aside></div></div><div id="modal" class="modal"><div id="qcard" class="card qbg-${qBgClass}">
@@ -856,8 +906,37 @@ ${model.design.bgMode==='image'&&model.design.bgImage?.data?`html:fullscreen bod
 </div>
 
 <div id="judge" class="judge"></div>
-</div></div><script>
+</div></div>
+<div id="gameDialogOverlay" class="gameDialogOverlay" role="dialog" aria-modal="true">
+  <div class="gameDialogBox">
+    <h3 id="gameDialogTitle">Подтверждение</h3>
+    <p id="gameDialogText"></p>
+    <div id="gameDialogActions" class="gameDialogActions"></div>
+  </div>
+</div><script>
 const G=${j};let scores=Array.from({length:G.teamCount||4},()=>0),used=new Set(),cur=null,judged=Array.from({length:G.teamCount||4},()=>0);
+let gameDialogResolve=null;
+function closeGameDialog(v){
+  gameDialogOverlay.classList.remove('show');
+  let r=gameDialogResolve;gameDialogResolve=null;if(r)r(v)
+}
+function gameConfirm(message,title='Подтверждение'){
+  return new Promise(resolve=>{
+    gameDialogResolve=resolve;gameDialogTitle.textContent=title;gameDialogText.textContent=String(message??'');gameDialogActions.innerHTML='';
+    let cancel=document.createElement('button');cancel.textContent='Отмена';cancel.onclick=()=>closeGameDialog(false);
+    let ok=document.createElement('button');ok.className='danger';ok.textContent='Продолжить';ok.onclick=()=>closeGameDialog(true);
+    gameDialogActions.append(cancel,ok);gameDialogOverlay.classList.add('show');setTimeout(()=>cancel.focus(),0)
+  })
+}
+function installGameProtection(){
+  document.addEventListener('contextmenu',e=>e.preventDefault());
+  document.addEventListener('dragstart',e=>{if(e.target?.tagName==='IMG')e.preventDefault()});
+  document.addEventListener('keydown',e=>{
+    const k=(e.key||'').toLowerCase();
+    const blocked=e.key==='F12'||(e.ctrlKey&&k==='u')||(e.ctrlKey&&e.shiftKey&&['i','j','c'].includes(k));
+    if(blocked){e.preventDefault();e.stopPropagation()}
+  },true)
+}
 function eH(x){return String(x??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
 function mg2(s,i){if(s[i]==='{'){let d=1,j=i+1;for(;j<s.length&&d;j++){if(s[j]==='{')d++;else if(s[j]==='}')d--}return[s.slice(i+1,j-1),j]}return[s[i]||'',i+1]}
 function ml(src){let B=String.fromCharCode(92),sy={pi:'π',pm:'±',times:'×',div:'÷',cdot:'·',ne:'≠',approx:'≈',le:'≤',ge:'≥',infty:'∞',circ:'°',angle:'∠',triangle:'△',alpha:'α',beta:'β',gamma:'γ',theta:'θ',sum:'∑'},o='',i=0;while(i<src.length){if(src[i]===B){let m=src.slice(i+1).match(/^[A-Za-z]+/);if(!m){o+=B;i++;continue}let c=m[0];i+=1+c.length;if(c==='frac'){let a=mg2(src,i);i=a[1];let b=mg2(src,i);i=b[1];o+='<span class="mfrac"><span class="num">'+ml(a[0])+'</span><span class="den">'+ml(b[0])+'</span></span>';continue}if(c==='sqrt'){let a=mg2(src,i);i=a[1];o+='<span class="msqrt">√<span class="body">'+ml(a[0])+'</span></span>';continue}if(c==='left'||c==='right')continue;o+=sy[c]||eH(c);continue}if(src[i]==='^'||src[i]==='_'){let su=src[i]==='^';i++;let a=mg2(src,i);i=a[1];o+='<span class="'+(su?'msup':'msub')+'">'+ml(a[0])+'</span>';continue}o+=eH(src[i]);i++}return o}
@@ -966,9 +1045,9 @@ function closeScratch(){
   let box=document.getElementById('scratchInline'),card=document.getElementById('qcard'),btn=document.getElementById('scratchBtn');
   if(box)box.classList.remove('show');if(card)card.classList.remove('scratch-open');if(btn)btn.textContent='✏ Черновик'
 }
-function scratchClear(){
+async function scratchClear(){
   if(!scratchObjects.length)return;
-  if(confirm('Очистить весь черновик?')){scratchObjects=[];scratchCurrent=null;scratchCommit();redrawScratch()}
+  if(await gameConfirm('Очистить весь черновик?','Очистить черновик?')){scratchObjects=[];scratchCurrent=null;scratchCommit();redrawScratch()}
 }
 function drawSmoothStroke(ctx,o){
   let pts=o.points||[];if(!pts.length)return;
@@ -1104,14 +1183,14 @@ function initScratch(){
   window.addEventListener('resize',()=>{if(document.getElementById('scratchInline')?.classList.contains('show'))setTimeout(resizeScratchCanvas,0)})
 }
 
-function resetGame(){if(confirm('Сбросить игру?')){scores=Array.from({length:G.teamCount||4},()=>0);used.clear();build()}}
-if(G.design.startTheme==='light')document.body.classList.add('light');build();updateScreenBtn();initScratch();
+async function resetGame(){if(await gameConfirm('Сбросить текущую игру и обнулить баллы?','Новая игра')){scores=Array.from({length:G.teamCount||4},()=>0);used.clear();build()}}
+installGameProtection();if(G.design.startTheme==='light')document.body.classList.add('light');build();updateScreenBtn();initScratch();
 <\/script></body></html>`
 }
 
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(helpOverlay.classList.contains('show'))closeHelp();else if(editOverlay.classList.contains('show'))closeEditor()}});
 bulkText.addEventListener('input',analyzeBulk);
-buildMathPalettes();renderAll();analyzeBulk();
+installBasicProtection();buildMathPalettes();renderAll();analyzeBulk();
 </script>
 </body>
 </html>
